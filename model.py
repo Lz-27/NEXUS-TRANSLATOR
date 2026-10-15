@@ -44,22 +44,22 @@ class TranslatorModel(QObject):
 
     def _translate_mymemory(self, text, source_code, target_code):
         import requests
-        src = 'auto' if source_code in ('auto', None) else source_code
+        src = 'en' if source_code in ('auto', None, '') else source_code
         tgt = target_code or 'es'
         
-        # Si source es auto, intentar omitir prefijo o usar en como default si falla
-        langpair = f"{src}|{tgt}"
+        if src == tgt:
+            return text
+            
         params = {
             'q': text,
-            'langpair': langpair
+            'langpair': f"{src}|{tgt}"
         }
-        resp = requests.get('https://api.mymemory.translated.net/get', params=params, timeout=6)
+        resp = requests.get('https://api.mymemory.translated.net/get', params=params, timeout=3)
         if resp.status_code == 200:
             data = resp.json()
-            if 'responseData' in data and data['responseData'] and data['responseData'].get('translatedText'):
-                translated = data['responseData']['translatedText']
-                # Si MyMemory devuelve un mensaje de error en responseDetails
-                if data.get('responseStatus') == 200 and translated:
+            if 'responseData' in data and data['responseData']:
+                translated = data['responseData'].get('translatedText')
+                if translated and not translated.startswith("MYMEMORY WARNING"):
                     return translated
         raise Exception("MyMemory translation failed")
 
@@ -68,7 +68,7 @@ class TranslatorModel(QObject):
         src = 'auto' if source_code in ('auto', None) else source_code
         tgt = target_code or 'es'
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         }
         params = {
             'client': 'gtx',
@@ -77,14 +77,14 @@ class TranslatorModel(QObject):
             'dt': 't',
             'q': text
         }
-        resp = requests.get('https://translate.googleapis.com/translate_a/single', params=params, headers=headers, timeout=5)
+        resp = requests.get('https://translate.googleapis.com/translate_a/single', params=params, headers=headers, timeout=3)
         if resp.status_code == 200:
             data = resp.json()
             if data and isinstance(data, list) and len(data) > 0 and isinstance(data[0], list):
                 result = "".join([segment[0] for segment in data[0] if segment and segment[0]])
                 if result:
                     return result
-        raise Exception(f"Google API returned status {resp.status_code}")
+        raise Exception(f"Google API error {resp.status_code}")
 
     def translate(self, text, source_lang_es, target_lang_es):
         try:
@@ -98,26 +98,27 @@ class TranslatorModel(QObject):
                 
             target_code = self.name_to_code.get(target_lang_es, 'es')
             
-            # Intento 1: GoogleTranslator (deep_translator)
+            # Intento 1: Google GTX API directa (rápida, sin bloqueo HTML y con soporte de auto-detección)
+            try:
+                return self._translate_google_api(text, source_code, target_code)
+            except Exception:
+                pass
+
+            # Intento 2: deep_translator GoogleTranslator
             try:
                 translator = GoogleTranslator(source=source_code, target=target_code)
                 return translator.translate(text)
-            except Exception as e_gt:
+            except Exception:
                 pass
 
-            # Intento 2: Endpoint directo Google GTX (API sin bloqueo HTML)
-            try:
-                return self._translate_google_api(text, source_code, target_code)
-            except Exception as e_gtx:
-                pass
-
-            # Intento 3: MyMemory API
+            # Intento 3: MyMemory API de respaldo
             try:
                 return self._translate_mymemory(text, source_code, target_code)
-            except Exception as e_mm:
+            except Exception:
                 pass
 
-            return "Oops, no fue posible conectar con los servidores de traducción. Por favor intenta más tarde."
+            return text
         except Exception as e:
             return f"Oops, error de conexión: {str(e)}"
+
 
