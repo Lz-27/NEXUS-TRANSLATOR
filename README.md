@@ -4,11 +4,10 @@
 [![PyQt6](https://img.shields.io/badge/GUI-PyQt6-41CD52?style=flat&logo=qt&logoColor=white)](https://riverbankcomputing.com/software/pyqt/)
 [![Architecture](https://img.shields.io/badge/Architecture-MVC-orange?style=flat)](#-architecture--arquitectura)
 
-
   <h1>Nexus Translator 🌐</h1>
+  <p><strong>Un traductor de escritorio moderno, elegante y súper rápido construido con Python y PyQt6.</strong></p>
 
 <img width="1262" height="764" alt="Image" src="https://github.com/user-attachments/assets/904f03f2-8c37-4035-b81c-bb44e53618ea" />
-  <p><strong>Un traductor de escritorio moderno, elegante y súper rápido construido con Python y PyQt6.</strong></p>
 </div>
 
 <br />
