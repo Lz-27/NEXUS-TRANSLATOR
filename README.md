@@ -1,4 +1,7 @@
 <div align="center">
+[![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=flat&logo=python&logoColor=white)](https://www.python.org/)
+[![PyQt6](https://img.shields.io/badge/GUI-PyQt6-41CD52?style=flat&logo=qt&logoColor=white)](https://riverbankcomputing.com/software/pyqt/)
+[![Architecture](https://img.shields.io/badge/Architecture-MVC-orange?style=flat)](#-architecture--arquitectura)
   <h1>Nexus Translator 🌐</h1>
 
 <img width="1262" height="764" alt="Image" src="https://github.com/user-attachments/assets/904f03f2-8c37-4035-b81c-bb44e53618ea" />
