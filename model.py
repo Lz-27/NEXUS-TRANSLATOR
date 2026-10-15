@@ -30,9 +30,6 @@ LANGUAGES_ES = {
 class TranslatorModel(QObject):
     def __init__(self):
         super().__init__()
-        # Mantenemos el diccionario original
-        self.original_languages_dict = GoogleTranslator().get_supported_languages(as_dict=True)
-        
         # Mapear los nombres a Español ordenados alfabéticamente
         spanish_names = list(LANGUAGES_ES.values())
         spanish_names.sort()
@@ -45,8 +42,55 @@ class TranslatorModel(QObject):
     def get_languages(self):
         return self.display_langs
 
+    def _translate_mymemory(self, text, source_code, target_code):
+        import requests
+        src = 'auto' if source_code in ('auto', None) else source_code
+        tgt = target_code or 'es'
+        
+        # Si source es auto, intentar omitir prefijo o usar en como default si falla
+        langpair = f"{src}|{tgt}"
+        params = {
+            'q': text,
+            'langpair': langpair
+        }
+        resp = requests.get('https://api.mymemory.translated.net/get', params=params, timeout=6)
+        if resp.status_code == 200:
+            data = resp.json()
+            if 'responseData' in data and data['responseData'] and data['responseData'].get('translatedText'):
+                translated = data['responseData']['translatedText']
+                # Si MyMemory devuelve un mensaje de error en responseDetails
+                if data.get('responseStatus') == 200 and translated:
+                    return translated
+        raise Exception("MyMemory translation failed")
+
+    def _translate_google_api(self, text, source_code, target_code):
+        import requests
+        src = 'auto' if source_code in ('auto', None) else source_code
+        tgt = target_code or 'es'
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+        params = {
+            'client': 'gtx',
+            'sl': src,
+            'tl': tgt,
+            'dt': 't',
+            'q': text
+        }
+        resp = requests.get('https://translate.googleapis.com/translate_a/single', params=params, headers=headers, timeout=5)
+        if resp.status_code == 200:
+            data = resp.json()
+            if data and isinstance(data, list) and len(data) > 0 and isinstance(data[0], list):
+                result = "".join([segment[0] for segment in data[0] if segment and segment[0]])
+                if result:
+                    return result
+        raise Exception(f"Google API returned status {resp.status_code}")
+
     def translate(self, text, source_lang_es, target_lang_es):
         try:
+            if not text or not text.strip():
+                return ""
+
             if source_lang_es == 'Detectar Idioma':
                 source_code = 'auto'
             else:
@@ -54,7 +98,26 @@ class TranslatorModel(QObject):
                 
             target_code = self.name_to_code.get(target_lang_es, 'es')
             
-            translator = GoogleTranslator(source=source_code, target=target_code)
-            return translator.translate(text)
+            # Intento 1: GoogleTranslator (deep_translator)
+            try:
+                translator = GoogleTranslator(source=source_code, target=target_code)
+                return translator.translate(text)
+            except Exception as e_gt:
+                pass
+
+            # Intento 2: Endpoint directo Google GTX (API sin bloqueo HTML)
+            try:
+                return self._translate_google_api(text, source_code, target_code)
+            except Exception as e_gtx:
+                pass
+
+            # Intento 3: MyMemory API
+            try:
+                return self._translate_mymemory(text, source_code, target_code)
+            except Exception as e_mm:
+                pass
+
+            return "Oops, no fue posible conectar con los servidores de traducción. Por favor intenta más tarde."
         except Exception as e:
             return f"Oops, error de conexión: {str(e)}"
+
