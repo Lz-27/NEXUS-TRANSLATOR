@@ -625,7 +625,10 @@ class TranslatorView(QMainWindow):
         text = btn.text()
         if text.endswith(" ▾"):
             text = text[:-2]
+        if text.startswith("Detectar Idioma"):
+            return "Detectar Idioma"
         return text
+
 
     def open_source_selector(self):
         current = self._get_lang_name_from_btn(self.source_lang_btn)
