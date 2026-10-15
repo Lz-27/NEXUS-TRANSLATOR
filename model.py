@@ -86,6 +86,31 @@ class TranslatorModel(QObject):
                     return result
         raise Exception(f"Google API error {resp.status_code}")
 
+    def _translate_single(self, text, source_code, target_code):
+        if not text or not text.strip():
+            return ""
+
+        # Intento 1: Google GTX API directa
+        try:
+            return self._translate_google_api(text, source_code, target_code)
+        except Exception:
+            pass
+
+        # Intento 2: deep_translator GoogleTranslator
+        try:
+            translator = GoogleTranslator(source=source_code, target=target_code)
+            return translator.translate(text)
+        except Exception:
+            pass
+
+        # Intento 3: MyMemory API de respaldo
+        try:
+            return self._translate_mymemory(text, source_code, target_code)
+        except Exception:
+            pass
+
+        return text
+
     def translate(self, text, source_lang_es, target_lang_es):
         try:
             if not text or not text.strip():
@@ -98,27 +123,29 @@ class TranslatorModel(QObject):
                 
             target_code = self.name_to_code.get(target_lang_es, 'es')
             
-            # Intento 1: Google GTX API directa (rápida, sin bloqueo HTML y con soporte de auto-detección)
-            try:
-                return self._translate_google_api(text, source_code, target_code)
-            except Exception:
-                pass
+            # Si el texto contiene varios párrafos y es extenso, distribuirlo en hilos paralelos
+            paragraphs = text.split('\n')
+            if len(paragraphs) > 1 and len(text) > 120:
+                from concurrent.futures import ThreadPoolExecutor
+                
+                # Ejecutar cada párrafo en paralelo usando un pool de hilos de trabajo
+                with ThreadPoolExecutor(max_workers=min(4, len(paragraphs))) as executor:
+                    futures = [
+                        executor.submit(self._translate_single, p, source_code, target_code) if p.strip() else None
+                        for p in paragraphs
+                    ]
+                    results = []
+                    for p, f in zip(paragraphs, futures):
+                        if f is not None:
+                            results.append(f.result())
+                        else:
+                            results.append(p)
+                    return "\n".join(results)
+            else:
+                return self._translate_single(text, source_code, target_code)
 
-            # Intento 2: deep_translator GoogleTranslator
-            try:
-                translator = GoogleTranslator(source=source_code, target=target_code)
-                return translator.translate(text)
-            except Exception:
-                pass
-
-            # Intento 3: MyMemory API de respaldo
-            try:
-                return self._translate_mymemory(text, source_code, target_code)
-            except Exception:
-                pass
-
-            return text
         except Exception as e:
             return f"Oops, error de conexión: {str(e)}"
+
 
 
