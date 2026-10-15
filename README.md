@@ -1,5 +1,7 @@
 <div align="center">
   <h1>Nexus Translator 🌐</h1>
+
+<img width="1262" height="764" alt="Image" src="https://github.com/user-attachments/assets/904f03f2-8c37-4035-b81c-bb44e53618ea" />
   <p><strong>Un traductor de escritorio moderno, elegante y súper rápido construido con Python y PyQt6.</strong></p>
 </div>
 
