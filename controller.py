@@ -43,7 +43,7 @@ class AudioWorker(QThread):
             self.error_signal.emit(str(e))
 
 class TranslationWorker(QThread):
-    result_ready = pyqtSignal(str, int)
+    result_ready = pyqtSignal(str, str, int)
 
     def __init__(self, model, text, source, target, request_id):
         super().__init__()
@@ -54,8 +54,9 @@ class TranslationWorker(QThread):
         self.request_id = request_id
 
     def run(self):
-        result = self.model.translate(self.text, self.source, self.target)
-        self.result_ready.emit(result, self.request_id)
+        result, detected_lang = self.model.translate(self.text, self.source, self.target)
+        self.result_ready.emit(result, detected_lang, self.request_id)
+
 
 class TranslatorController:
     def __init__(self, model, view):
@@ -136,7 +137,7 @@ class TranslatorController:
         print(f"Error de Audio: {error_msg}")
 
     def on_text_changed(self):
-        self.timer.start(400)
+        self.timer.start(250)
         
     def on_swap_requested(self):
         self.view.swap_languages()
@@ -159,6 +160,13 @@ class TranslatorController:
         self.current_request_id += 1
         req_id = self.current_request_id
         
+        # Desconectar o terminar trabajadores anteriores no relevantes para liberar carga
+        for w in list(self.active_workers):
+            try:
+                w.result_ready.disconnect()
+            except Exception:
+                pass
+
         worker = TranslationWorker(self.model, text, source_lang, target_lang, req_id)
         worker.result_ready.connect(self.on_translation_finished)
         worker.finished.connect(lambda w=worker: self.cleanup_worker(w))
@@ -166,11 +174,17 @@ class TranslatorController:
         self.active_workers.append(worker)
         worker.start()
 
-    def on_translation_finished(self, translated_text, req_id):
+
+    def on_translation_finished(self, translated_text, detected_lang, req_id):
         if req_id == self.current_request_id:
             self.view.target_text.setPlainText(translated_text)
             self.view.status_badge.setText("Listo")
             
+            # Si el usuario eligió 'Detectar Idioma', mostrar el idioma detectado en el botón
+            current_src_text = self.view.source_lang_btn.text()
+            if "Detectar Idioma" in current_src_text and detected_lang:
+                self.view.source_lang_btn.setText(f"Detectar Idioma ({detected_lang}) ▾")
+
             source = self.view.source_text.toPlainText().strip()
             if source and translated_text and "Oops, error" not in translated_text:
                 source_lang = self.view._get_lang_name_from_btn(self.view.source_lang_btn)
@@ -181,3 +195,4 @@ class TranslatorController:
     def cleanup_worker(self, worker):
         if worker in self.active_workers:
             self.active_workers.remove(worker)
+
